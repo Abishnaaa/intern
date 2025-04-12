@@ -160,12 +160,16 @@ def classify_document(text, expected_type=None):
     
     # Check if it matches expected type
     matches_expected = False
+
     if expected_type:
         if expected_type == best_category:
             matches_expected = True
         elif best_category == "unknown" and expected_type in categories:
-            # If we couldn't confidently determine a type, give benefit of doubt
-            matches_expected = True
+        # Only give benefit of doubt if we found at least one relevant keyword
+            if len(keywords_found) > 0:  # This checks if we found ANY relevant keywords
+                matches_expected = True
+            else:
+                matches_expected = False  # Reject documents with no relevant keywords
     
     return {
         "document_type": best_category,
@@ -209,13 +213,13 @@ def upload_pdf(request):
             classification = classify_document(extracted_text, expected_type)
             
             # Determine if document is valid
+            # In your upload_pdf function
             is_valid = classification["matches_expected"]
-            if not is_valid and classification["document_type"] != "unknown":
-                message = f"Invalid document. This appears to be a {classification['document_type']} document, not a {expected_type} document."
-            elif not is_valid and classification["document_type"] == "unknown":
-                message = f"Unable to verify this as a {expected_type} document. Please ensure the document contains relevant content."
-            else:
-                message = "Document verified successfully"
+            if not is_valid and classification["document_type"] == "unknown":
+                if len(classification["keywords_found"]) == 0:
+                    message = f"Cannot verify this as a {expected_type} document. No relevant content found."
+                else:
+                    message = f"Unable to verify this as a {expected_type} document. Insufficient relevant content."
             
             # Populate response
             response_data["message"] = message
